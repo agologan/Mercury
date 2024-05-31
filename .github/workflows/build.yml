@@ -1,0 +1,43 @@
+on:
+  push:
+
+env:
+  MOZBUILD_STATE_PATH: ${{ github.workspace }}/.mozbuild
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mercury
+
+      - uses: actions/checkout@v4
+        with:
+          repository: mozilla/gecko-dev
+          ref: release
+          path: mozilla-unified
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - working-directory: mozilla-unified
+        run: |
+          ./mach bootstrap --application-choice browser --no-system-changes
+
+      - env:
+          TERM: linux
+          HG_SRC_DIR: ../mozilla-unified
+          changeset: ${{ github.sha }}
+        working-directory: mercury
+        run: |
+          echo "export MOZ_SOURCE_REPO=\"$GITHUB_REPOSITORY\"" >> $HG_SRC_DIR/mozconfig
+          ./setup.sh --mac-cross
+          ./build.sh
+          ./package.sh
+
+      - run: |
+          ls -alh
+          ls -alh mozilla-unified/release
